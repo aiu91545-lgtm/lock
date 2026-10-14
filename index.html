@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>そのままロック</title>
+<style>
+:root{--bg:#f3f1ec;--fg:#1c1c1a;--sub:#6b6a64;--card:#fff;--line:#d9d6cc;--ac:#1c1c1a;--acfg:#fff;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#161615;--fg:#eeece6;--sub:#9a988f;--card:#222220;--line:#383835;--ac:#eeece6;--acfg:#161615}}
+:root[data-theme="dark"]{--bg:#161615;--fg:#eeece6;--sub:#9a988f;--card:#222220;--line:#383835;--ac:#eeece6;--acfg:#161615}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{height:100%;margin:0}
+body{background:var(--bg);color:var(--fg);font-family:-apple-system,"Hiragino Sans","Noto Sans JP",sans-serif;line-height:1.6}
+main{max-width:480px;margin:0 auto;padding:24px 20px 40px}
+h1{font-size:22px;margin:8px 0 4px}
+p.lead{color:var(--sub);margin:0 0 24px;font-size:14px}
+h2{font-size:15px;margin:24px 0 10px}
+.row{display:flex;gap:10px;flex-wrap:wrap}
+.opt{flex:1 1 90px;border:1.5px solid var(--line);background:var(--card);color:var(--fg);border-radius:12px;padding:12px 8px;font-size:14px;text-align:center;cursor:pointer;font-family:inherit}
+.opt[aria-pressed="true"]{border-color:var(--ac);outline:1.5px solid var(--ac)}
+.sw{width:44px;height:44px;border-radius:50%;border:2px solid var(--line);cursor:pointer;flex:none}
+.sw[aria-pressed="true"]{outline:2px solid var(--ac);outline-offset:2px}
+label.t{display:flex;align-items:center;justify-content:space-between;padding:12px 0;border-bottom:1px solid var(--line);font-size:14px}
+input[type=range]{width:50%}
+.prev{height:140px;border-radius:14px;border:1px solid var(--line);margin-top:16px;display:flex;align-items:center;justify-content:center;overflow:hidden;background-size:cover;background-position:center;font-variant-numeric:tabular-nums}
+.go{width:100%;margin-top:28px;padding:16px;border:0;border-radius:14px;background:var(--ac);color:var(--acfg);font-size:17px;font-weight:600;font-family:inherit;cursor:pointer}
+.note{font-size:12.5px;color:var(--sub);margin-top:14px}
+#lock{position:fixed;inset:0;display:none;z-index:99;touch-action:none;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none;align-items:center;justify-content:center;background-size:cover;background-position:center}
+#lock.on{display:flex}
+#ring,#hint,#dot{display:none!important}
+#clock{font-size:15vw;font-weight:200;letter-spacing:.02em;font-variant-numeric:tabular-nums}
+#ring{position:absolute;width:84px;height:84px;margin:-42px 0 0 -42px;pointer-events:none;opacity:0}
+#ring circle{fill:none;stroke:#fff;stroke-width:4;stroke-linecap:round;transform:rotate(-90deg);transform-origin:50% 50%}
+#dot{display:none;position:absolute;top:calc(16px + env(safe-area-inset-top,0px));right:16px;width:8px;height:8px;border-radius:50%;background:#e33;opacity:.4}
+#hint{position:absolute;bottom:calc(28px + env(safe-area-inset-bottom,0px));left:0;right:0;text-align:center;font-size:13px;opacity:.55;transition:opacity .6s}
+</style>
+</head>
+<body>
+<main>
+<h1>そのままロック</h1>
+<p class="lead">ロック中は、タッチを受け付けず、好きな画面を表示します。</p>
+
+<h2>ロック中の画面</h2>
+<div class="row" id="modes">
+<button class="opt" data-m="black" aria-pressed="true">真っ黒</button>
+<button class="opt" data-m="clock" aria-pressed="false">時計</button>
+<button class="opt" data-m="color" aria-pressed="false">色</button>
+<button class="opt" data-m="image" aria-pressed="false">画像</button>
+</div>
+<div class="row" id="colors" style="margin-top:12px;display:none"></div>
+<input id="file" type="file" accept="image/*" hidden>
+<button class="opt" id="pick" style="display:none;margin-top:12px;width:100%">画像を選ぶ</button>
+<div class="prev" id="prev"></div>
+
+<h2>設定</h2>
+<label class="t">解除に必要な長押し時間<input type="range" id="hold" min="1" max="5" step="0.5" value="2"></label>
+<label class="t">画面を点けたままにする<input type="checkbox" id="awake" checked></label>
+<label class="t">操作のヒントを表示<input type="checkbox" id="showhint"></label>
+<label class="t">ロック中にカメラで録画<input type="checkbox" id="rec"></label>
+<label class="t">カメラ<select id="cam" style="font-size:14px;padding:6px;border-radius:8px;border:1px solid var(--line);background:var(--card);color:var(--fg)"><option value="environment">背面</option><option value="user">前面</option></select></label>
+<label class="t">音声も録音<input type="checkbox" id="mic" checked></label>
+
+<button class="go" id="start">ロックする</button>
+<p class="note" id="err" style="color:#d33"></p>
+<p class="note">解除は、画面のどこかを指定した秒数だけ長押しします。iPhoneでは、Safariの共有ボタンから「ホーム画面に追加」して開くと、アドレスバーのないフル画面で使えます。</p>
+<p class="note">このアプリはSafari内でのみ動作します。ほかのアプリの上に重ねてロックすることはできません。</p>
+</main>
+
+<div id="lock">
+<svg id="ring" viewBox="0 0 84 84"><circle cx="42" cy="42" r="36" stroke-dasharray="226" stroke-dashoffset="226"/></svg>
+<div id="clock"></div>
+<div id="hint"></div>
+<div id="dot"></div>
+</div>
+<div id="done" style="display:none;position:fixed;inset:0;z-index:100;background:var(--bg);flex-direction:column;align-items:center;justify-content:center;gap:14px;padding:20px">
+<video id="pv" controls playsinline style="max-width:100%;max-height:55%;border-radius:12px"></video>
+<p id="info" class="note" style="margin:0"></p>
+<button class="go" id="save" style="margin:0;max-width:440px">保存・共有</button>
+<button class="opt" id="close" style="width:100%;max-width:440px;flex:none">閉じる</button>
+</div>
+
+<script>
+var S={mode:'black',color:'#0b1a2e',img:null};
+var COLORS=['#0b1a2e','#2b0f14','#0e2a1f','#ffffff'];
+var $=function(i){return document.getElementById(i)};
+var lock=$('lock'),clock=$('clock'),ring=$('ring'),circ=ring.querySelector('circle'),hint=$('hint'),prev=$('prev');
+var wl=null,tick=null,t0=0,raf=null,holding=false,hintTimer=null;
+
+COLORS.forEach(function(c,i){var b=document.createElement('button');b.className='sw';b.style.background=c;b.setAttribute('aria-label','色 '+c);b.setAttribute('aria-pressed',i===0);b.onclick=function(){S.color=c;[].forEach.call($('colors').children,function(x){x.setAttribute('aria-pressed',x===b)});render()};$('colors').appendChild(b)});
+
+function pad(n){return n<10?'0'+n:''+n}
+function timeStr(){var d=new Date();return pad(d.getHours())+':'+pad(d.getMinutes())}
+function paint(el,big){
+  el.style.backgroundImage='none';el.style.backgroundColor='#000';el.style.color='#fff';
+  if(S.mode==='color'){el.style.backgroundColor=S.color;el.style.color=S.color==='#ffffff'?'#111':'#fff'}
+  if(S.mode==='image'&&S.img){el.style.backgroundImage='url('+S.img+')'}
+}
+function render(){
+  paint(prev);prev.textContent=S.mode==='clock'?timeStr():'';
+  prev.style.fontSize='44px';prev.style.fontWeight=200;
+}
+$('modes').onclick=function(e){var b=e.target.closest('.opt');if(!b)return;S.mode=b.dataset.m;
+  [].forEach.call($('modes').children,function(x){x.setAttribute('aria-pressed',x===b)});
+  $('colors').style.display=S.mode==='color'?'flex':'none';
+  $('pick').style.display=S.mode==='image'?'block':'none';
+  if(S.mode==='image'&&!S.img)$('file').click();render()};
+$('pick').onclick=function(){$('file').click()};
+$('file').onchange=function(){var f=this.files[0];if(!f)return;var r=new FileReader();r.onload=function(){S.img=r.result;render()};r.readAsDataURL(f)};
+
+async function keepAwake(){try{if($('awake').checked&&navigator.wakeLock)wl=await navigator.wakeLock.request('screen')}catch(e){}}
+function release(){try{if(wl)wl.release()}catch(e){}wl=null}
+document.addEventListener('visibilitychange',function(){if(lock.classList.contains('on')&&document.visibilityState==='visible')keepAwake()});
+
+function showHint(){
+  if(!$('showhint').checked){hint.textContent='';return}
+  hint.textContent=$('hold').value+'秒間長押しで解除';hint.style.opacity='.55';
+  clearTimeout(hintTimer);hintTimer=setTimeout(function(){hint.style.opacity='0'},3000);
+}
+var info='',stream=null,mr=null,chunks=[],mime='',blobUrl=null,blobFile=null;
+async function startRec(){
+  $('err').textContent='';
+  var Q={low:{w:854,h:480,b:1500000},mid:{w:1280,h:720,b:4000000},high:{w:3840,h:2160,b:25000000}}.high;
+  if(!navigator.mediaDevices||!window.MediaRecorder){$('err').textContent='このブラウザは録画に対応していません';return false}
+  try{stream=await Promise.race([navigator.mediaDevices.getUserMedia({video:{facingMode:$('cam').value,width:{ideal:Q.w},height:{ideal:Q.h},frameRate:{ideal:60}},audio:$('mic').checked}),new Promise(function(_,rej){setTimeout(function(){rej({name:'Timeout'})},10000)})])}
+  catch(e){$('err').textContent='カメラを開始できませんでした（'+(e.name||'error')+'）。このページ内ではカメラが許可されていない可能性があります。';return false}
+  mime=['video/mp4','video/webm;codecs=vp9,opus','video/webm'].filter(function(t){return MediaRecorder.isTypeSupported(t)})[0]||'';
+  chunks=[];var o={videoBitsPerSecond:Q.b};if(mime)o.mimeType=mime;mr=new MediaRecorder(stream,o);
+  mr.ondataavailable=function(e){if(e.data&&e.data.size)chunks.push(e.data)};
+  var s=stream.getVideoTracks()[0].getSettings();info=s.width+'x'+s.height+' / '+Math.round(s.frameRate||0)+'fps';mr.onstop=finishRec;mr.start(1000);return true;
+}
+function stopRec(){
+  $('dot').style.display='none';
+  if(mr&&mr.state!=='inactive')mr.stop();
+  if(stream)stream.getTracks().forEach(function(t){t.stop()});
+}
+function finishRec(){
+  var type=(mr.mimeType||mime||'video/mp4').split(';')[0],ext=type.indexOf('webm')>-1?'webm':'mp4';
+  var blob=new Blob(chunks,{type:type});
+  blobFile=new File([blob],'rec-'+Date.now()+'.'+ext,{type:type});
+  if(blobUrl)URL.revokeObjectURL(blobUrl);
+  blobUrl=URL.createObjectURL(blob);
+  $('pv').src=blobUrl;$('info').textContent='録画: '+info;$('done').style.display='flex';mr=null;stream=null;
+}
+$('save').onclick=async function(){
+  try{if(navigator.canShare&&navigator.canShare({files:[blobFile]})){await navigator.share({files:[blobFile]});return}}
+  catch(e){if(e.name==='AbortError')return}
+  var a=document.createElement('a');a.href=blobUrl;a.download=blobFile.name;a.click();
+};
+$('close').onclick=function(){$('done').style.display='none';$('pv').removeAttribute('src')};
+$('start').onclick=async function(){
+  if($('rec').checked){var ok=await startRec();if(!ok)return}
+  paint(lock);clock.style.display=S.mode==='clock'?'block':'none';clock.textContent=timeStr();
+  lock.classList.add('on');keepAwake();showHint();
+  try{if(document.documentElement.requestFullscreen)document.documentElement.requestFullscreen()}catch(e){}
+  tick=setInterval(function(){clock.textContent=timeStr()},1000);
+};
+function unlock(){
+  stopRec();lock.classList.remove('on');release();clearInterval(tick);cancel();
+  try{if(document.fullscreenElement)document.exitFullscreen()}catch(e){}
+}
+function cancel(){holding=false;cancelAnimationFrame(raf);ring.style.opacity=0;circ.style.strokeDashoffset=226}
+function step(){
+  if(!holding)return;
+  var need=parseFloat($('hold').value)*1000,p=Math.min(1,(performance.now()-t0)/need);
+  circ.style.strokeDashoffset=226*(1-p);
+  if(p>=1){unlock();return}
+  raf=requestAnimationFrame(step);
+}
+lock.addEventListener('pointerdown',function(e){
+  e.preventDefault();showHint();holding=true;t0=performance.now();
+  ring.style.left=e.clientX+'px';ring.style.top=e.clientY+'px';ring.style.opacity=1;raf=requestAnimationFrame(step);
+});
+['pointerup','pointercancel'].forEach(function(n){lock.addEventListener(n,cancel)});
+['touchmove','touchstart','contextmenu','gesturestart','wheel'].forEach(function(n){lock.addEventListener(n,function(e){e.preventDefault()},{passive:false})});
+render();
+</script>
+</body>
+</html>
