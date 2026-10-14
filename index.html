@@ -119,11 +119,19 @@ function showHint(){
   clearTimeout(hintTimer);hintTimer=setTimeout(function(){hint.style.opacity='0'},3000);
 }
 var info='',stream=null,mr=null,chunks=[],mime='',blobUrl=null,blobFile=null;
+async function openCam(){
+  var L=[[3840,2160,60],[3840,2160,30],[1920,1080,60],[1920,1080,30],[1280,720,30]],a=$('mic').checked,f=$('cam').value;
+  for(var i=0;i<L.length;i++){
+    try{return await navigator.mediaDevices.getUserMedia({video:{facingMode:f,width:{exact:L[i][0]},height:{exact:L[i][1]},frameRate:{exact:L[i][2]}},audio:a})}
+    catch(e){if(e.name==='NotAllowedError')throw e}
+  }
+  return await navigator.mediaDevices.getUserMedia({video:{facingMode:f},audio:a});
+}
 async function startRec(){
   $('err').textContent='';
   var Q={low:{w:854,h:480,b:1500000},mid:{w:1280,h:720,b:4000000},high:{w:3840,h:2160,b:25000000}}.high;
   if(!navigator.mediaDevices||!window.MediaRecorder){$('err').textContent='このブラウザは録画に対応していません';return false}
-  try{stream=await Promise.race([navigator.mediaDevices.getUserMedia({video:{facingMode:$('cam').value,width:{ideal:Q.w},height:{ideal:Q.h},frameRate:{ideal:60}},audio:$('mic').checked}),new Promise(function(_,rej){setTimeout(function(){rej({name:'Timeout'})},10000)})])}
+  try{stream=await Promise.race([openCam(),new Promise(function(_,rej){setTimeout(function(){rej({name:'Timeout'})},30000)})])}
   catch(e){$('err').textContent='カメラを開始できませんでした（'+(e.name||'error')+'）。このページ内ではカメラが許可されていない可能性があります。';return false}
   mime=['video/mp4','video/webm;codecs=vp9,opus','video/webm'].filter(function(t){return MediaRecorder.isTypeSupported(t)})[0]||'';
   chunks=[];var o={videoBitsPerSecond:Q.b};if(mime)o.mimeType=mime;mr=new MediaRecorder(stream,o);
