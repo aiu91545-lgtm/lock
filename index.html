@@ -120,11 +120,13 @@ function showHint(){
 }
 var info='',stream=null,mr=null,chunks=[],mime='',blobUrl=null,blobFile=null;
 async function openCam(){
-  var L=[[3840,2160,60],[3840,2160,30],[1920,1080,60],[1920,1080,30],[1280,720,30]],a=$('mic').checked,f=$('cam').value;
+  var L=[],B=[[3840,2160,60],[3840,2160,30],[1920,1080,60],[1920,1080,30],[1280,720,30]],a=$('mic').checked,f=$('cam').value;
+  B.forEach(function(x){L.push(x);L.push([x[1],x[0],x[2]])});
   for(var i=0;i<L.length;i++){
     try{return await navigator.mediaDevices.getUserMedia({video:{facingMode:f,width:{exact:L[i][0]},height:{exact:L[i][1]},frameRate:{exact:L[i][2]}},audio:a})}
     catch(e){if(e.name==='NotAllowedError')throw e}
   }
+  try{return await navigator.mediaDevices.getUserMedia({video:{facingMode:f,width:{ideal:1920},height:{ideal:1080}},audio:a})}catch(e){if(e.name==='NotAllowedError')throw e}
   return await navigator.mediaDevices.getUserMedia({video:{facingMode:f},audio:a});
 }
 async function startRec(){
@@ -136,7 +138,7 @@ async function startRec(){
   mime=['video/mp4','video/webm;codecs=vp9,opus','video/webm'].filter(function(t){return MediaRecorder.isTypeSupported(t)})[0]||'';
   chunks=[];var o={videoBitsPerSecond:Q.b};if(mime)o.mimeType=mime;mr=new MediaRecorder(stream,o);
   mr.ondataavailable=function(e){if(e.data&&e.data.size)chunks.push(e.data)};
-  var s=stream.getVideoTracks()[0].getSettings();info=s.width+'x'+s.height+' / '+Math.round(s.frameRate||0)+'fps';mr.onstop=finishRec;mr.start(1000);return true;
+  var s=stream.getVideoTracks()[0].getSettings();info='v3 '+s.width+'x'+s.height+' / '+Math.round(s.frameRate||0)+'fps';mr.onstop=finishRec;mr.start(1000);return true;
 }
 function stopRec(){
   $('dot').style.display='none';
