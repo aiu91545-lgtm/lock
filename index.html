@@ -39,7 +39,7 @@ input[type=range]{width:50%}
 </head>
 <body>
 <main>
-<h1>そのままロック <small style="font-size:12px;color:var(--sub)">v6</small></h1>
+<h1>そのままロック <small style="font-size:12px;color:var(--sub)">v7</small></h1>
 <p class="lead">ロック中は、タッチを受け付けず、好きな画面を表示します。</p>
 
 <h2>ロック中の画面</h2>
@@ -61,6 +61,7 @@ input[type=range]{width:50%}
 <label class="t">ロック中にカメラで録画<input type="checkbox" id="rec"></label>
 <label class="t">カメラ<select id="cam" style="font-size:14px;padding:6px;border-radius:8px;border:1px solid var(--line);background:var(--card);color:var(--fg)"><option value="environment">背面</option><option value="user">前面</option></select></label>
 <label class="t">音声も録音<input type="checkbox" id="mic" checked></label>
+<label class="t">優先<select id="pri" style="font-size:14px;padding:6px;border-radius:8px;border:1px solid var(--line);background:var(--card);color:var(--fg)"><option value="res">解像度（4K）</option><option value="fps">滑らかさ（60fps）</option></select></label>
 
 <button class="go" id="start">ロックする</button>
 <p class="note" id="err" style="color:#d33"></p>
@@ -121,11 +122,12 @@ function showHint(){
 var info='',stream=null,mr=null,chunks=[],mime='',blobUrl=null,blobFile=null;
 var camLog='';
 async function openCam(){
-  var R=[[3840,2160],[1920,1080],[1280,720]],a=$('mic').checked,f=$('cam').value,L=[];
+  var fp=$('pri').value==='fps'?{exact:60}:{ideal:60};
+  var R=$('pri').value==='fps'?[[1920,1080],[1280,720]]:[[3840,2160],[1920,1080],[1280,720]],a=$('mic').checked,f=$('cam').value,L=[];
   camLog='';
   R.forEach(function(x){L.push(x);L.push([x[1],x[0]])});
   for(var i=0;i<L.length;i++){
-    try{return await navigator.mediaDevices.getUserMedia({video:{facingMode:f,width:{exact:L[i][0]},height:{exact:L[i][1]},frameRate:{ideal:60}},audio:a})}
+    try{return await navigator.mediaDevices.getUserMedia({video:{facingMode:f,width:{exact:L[i][0]},height:{exact:L[i][1]},frameRate:fp},audio:a})}
     catch(e){if(e.name==='NotAllowedError')throw e;camLog+=L[i][0]+'x'+L[i][1]+' NG:'+e.name+' '}
   }
   camLog+='fallback ';
