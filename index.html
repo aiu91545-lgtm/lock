@@ -39,7 +39,7 @@ input[type=range]{width:50%}
 </head>
 <body>
 <main>
-<h1>そのままロック</h1>
+<h1>そのままロック <small style="font-size:12px;color:var(--sub)">v5</small></h1>
 <p class="lead">ロック中は、タッチを受け付けず、好きな画面を表示します。</p>
 
 <h2>ロック中の画面</h2>
@@ -119,14 +119,18 @@ function showHint(){
   clearTimeout(hintTimer);hintTimer=setTimeout(function(){hint.style.opacity='0'},3000);
 }
 var info='',stream=null,mr=null,chunks=[],mime='',blobUrl=null,blobFile=null;
+var camLog='';
 async function openCam(){
-  var L=[],B=[[3840,2160,60],[3840,2160,30],[1920,1080,60],[1920,1080,30],[1280,720,30]],a=$('mic').checked,f=$('cam').value;
-  B.forEach(function(x){L.push(x);L.push([x[1],x[0],x[2]])});
+  var R=[[3840,2160],[1920,1080],[1280,720]],a=$('mic').checked,f=$('cam').value,L=[];
+  camLog='';
+  R.forEach(function(x){L.push(x);L.push([x[1],x[0]])});
   for(var i=0;i<L.length;i++){
-    try{return await navigator.mediaDevices.getUserMedia({video:{facingMode:f,width:{exact:L[i][0]},height:{exact:L[i][1]},frameRate:{exact:L[i][2]}},audio:a})}
-    catch(e){if(e.name==='NotAllowedError')throw e}
+    try{return await navigator.mediaDevices.getUserMedia({video:{facingMode:f,width:{exact:L[i][0]},height:{exact:L[i][1]},frameRate:{ideal:60}},audio:a})}
+    catch(e){if(e.name==='NotAllowedError')throw e;camLog+=L[i][0]+'x'+L[i][1]+' NG:'+e.name+' '}
   }
-  try{return await navigator.mediaDevices.getUserMedia({video:{facingMode:f,width:{ideal:1920},height:{ideal:1080}},audio:a})}catch(e){if(e.name==='NotAllowedError')throw e}
+  camLog+='fallback ';
+  try{return await navigator.mediaDevices.getUserMedia({video:{facingMode:f,width:{min:1280,ideal:1920},height:{min:720,ideal:1080}},audio:a})}
+  catch(e){if(e.name==='NotAllowedError')throw e;camLog+='min720 NG:'+e.name+' '}
   return await navigator.mediaDevices.getUserMedia({video:{facingMode:f},audio:a});
 }
 async function startRec(){
@@ -138,7 +142,7 @@ async function startRec(){
   mime=['video/mp4','video/webm;codecs=vp9,opus','video/webm'].filter(function(t){return MediaRecorder.isTypeSupported(t)})[0]||'';
   chunks=[];var o={videoBitsPerSecond:Q.b};if(mime)o.mimeType=mime;mr=new MediaRecorder(stream,o);
   mr.ondataavailable=function(e){if(e.data&&e.data.size)chunks.push(e.data)};
-  var s=stream.getVideoTracks()[0].getSettings();info='v3 '+s.width+'x'+s.height+' / '+Math.round(s.frameRate||0)+'fps';mr.onstop=finishRec;mr.start(1000);return true;
+  var s=stream.getVideoTracks()[0].getSettings();info='v5 '+s.width+'x'+s.height+' / '+Math.round(s.frameRate||0)+'fps';mr.onstop=finishRec;mr.start(1000);return true;
 }
 function stopRec(){
   $('dot').style.display='none';
@@ -151,7 +155,7 @@ function finishRec(){
   blobFile=new File([blob],'rec-'+Date.now()+'.'+ext,{type:type});
   if(blobUrl)URL.revokeObjectURL(blobUrl);
   blobUrl=URL.createObjectURL(blob);
-  $('pv').src=blobUrl;$('info').textContent='録画: '+info;$('done').style.display='flex';mr=null;stream=null;
+  $('pv').src=blobUrl;var msg='録画: '+info+(camLog?' （'+camLog+'）':'');$('info').textContent=msg;setTimeout(function(){alert(msg)},400);$('done').style.display='flex';mr=null;stream=null;
 }
 $('save').onclick=async function(){
   try{if(navigator.canShare&&navigator.canShare({files:[blobFile]})){await navigator.share({files:[blobFile]});return}}
