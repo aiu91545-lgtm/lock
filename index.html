@@ -39,7 +39,7 @@ input[type=range]{width:50%}
 </head>
 <body>
 <main>
-<h1>そのままロック <small style="font-size:12px;color:var(--sub)">v9</small></h1>
+<h1>そのままロック <small style="font-size:12px;color:var(--sub)">v10</small></h1>
 <p class="lead">ロック中は、タッチを受け付けず、好きな画面を表示します。</p>
 
 <h2>ロック中の画面</h2>
@@ -64,6 +64,7 @@ input[type=range]{width:50%}
 <label class="t">優先<select id="pri" style="font-size:14px;padding:6px;border-radius:8px;border:1px solid var(--line);background:var(--card);color:var(--fg)"><option value="res">解像度（4K）</option><option value="fps">滑らかさ（60fps）</option></select></label>
 
 <button class="go" id="start">ロックする</button>
+<button class="opt" id="last" style="display:none;width:100%;margin-top:12px;flex:none"></button>
 <p class="note" id="err" style="color:#d33"></p>
 <p class="note">解除は、画面のどこかを指定した秒数だけ長押しします。iPhoneでは、Safariの共有ボタンから「ホーム画面に追加」して開くと、アドレスバーのないフル画面で使えます。</p>
 <p class="note">このアプリはSafari内でのみ動作します。ほかのアプリの上に重ねてロックすることはできません。</p>
@@ -155,10 +156,31 @@ function finishRec(){
   var type=(mr.mimeType||mime||'video/mp4').split(';')[0],ext=type.indexOf('webm')>-1?'webm':'mp4';
   var blob=new Blob(chunks,{type:type});
   blobFile=new File([blob],'rec-'+Date.now()+'.'+ext,{type:type});
+  saveLast(blob,blobFile.name,type).then(refreshLast);
   if(blobUrl)URL.revokeObjectURL(blobUrl);
   blobUrl=URL.createObjectURL(blob);
   $('pv').src=blobUrl;var msg='録画: '+info+(camLog?' （'+camLog+'）':'');$('info').textContent=msg;setTimeout(function(){alert(msg)},400);$('done').style.display='flex';mr=null;stream=null;
 }
+function dbOpen(){return new Promise(function(res,rej){var r=indexedDB.open('lockrec',1);r.onupgradeneeded=function(){r.result.createObjectStore('v')};r.onsuccess=function(){res(r.result)};r.onerror=function(){rej(r.error)}})}
+async function saveLast(blob,name,type){
+  try{var db=await dbOpen();await new Promise(function(res,rej){var t=db.transaction('v','readwrite');t.objectStore('v').put({blob:blob,name:name,type:type,time:Date.now()},'last');t.oncomplete=res;t.onerror=function(){rej(t.error)};t.onabort=function(){rej(t.error)}})}catch(e){}
+}
+async function loadLast(){
+  try{var db=await dbOpen();return await new Promise(function(res){var q=db.transaction('v').objectStore('v').get('last');q.onsuccess=function(){res(q.result||null)};q.onerror=function(){res(null)}})}catch(e){return null}
+}
+function showLast(r){
+  blobFile=new File([r.blob],r.name,{type:r.type});
+  if(blobUrl)URL.revokeObjectURL(blobUrl);
+  blobUrl=URL.createObjectURL(r.blob);
+  $('pv').src=blobUrl;$('info').textContent='';$('done').style.display='flex';
+}
+async function refreshLast(){
+  var r=await loadLast(),b=$('last');
+  if(!r){b.style.display='none';return}
+  b.style.display='block';b.textContent='前回の録画を開く（'+new Date(r.time).toLocaleString('ja-JP')+'）';
+  b.onclick=function(){showLast(r)};
+}
+refreshLast();
 $('save').onclick=async function(){
   try{if(navigator.canShare&&navigator.canShare({files:[blobFile]})){await navigator.share({files:[blobFile]});return}}
   catch(e){if(e.name==='AbortError')return}
